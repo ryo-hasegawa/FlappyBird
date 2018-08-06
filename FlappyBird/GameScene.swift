@@ -181,6 +181,16 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
             // Y軸の下限にランダムな値を足して、下の壁のY座標を決定
             let under_wall_y = CGFloat(under_wall_lowest_y + random_y)
             
+            //let item_center_y = self.frame.size.height / 2
+            //let random_item_range = self.frame.size.height / 4
+            //let item_lowest_y = UInt32( item_y - itemTexture.size().height / 2 -  random_item_range / 2)
+            //let item_highest_y = UInt32( item_y - itemTexture.size().height / 5 -  random_item_range / 5)
+            //let random_item_y = arc4random_uniform(UInt32(random_item_range))
+            //let item_y = CGFloat(item_lowest_y + random_item_y)
+            
+            //let random_item = SKSpriteNode(texture: itemTexture)
+            //item.position = CGPoint(x: 0.0, y: item_y)
+            
             // キャラが通り抜ける隙間の長さ
             let slit_length = self.frame.size.height / 6
             
@@ -310,11 +320,19 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
                 itemNode.removeChildren(in: [contact.bodyB.node!])
             }
             
-            audioPlayerInstance01.play()
-            
             print("ItemGet")
             itemScore += 1
             itemScoreLabelNode.text = "Item Score:\(itemScore)"
+            // ベストスコア更新か確認する --- ここから ---
+            var ItembestScore = userDefaults.integer(forKey: "ITEM")
+            if itemScore > ItembestScore {
+                ItembestScore = itemScore
+                bestItemScoreLabelNode.text = "ItembestScore:\(ItembestScore)"
+                userDefaults.set(ItembestScore, forKey: "ITEM")
+                userDefaults.synchronize()
+            } // --- ここまで
+            audioPlayerInstance01.play()
+            
         }
         
         else {
@@ -349,6 +367,10 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
         score = 0
         scoreLabelNode.text = String("Score:\(score)")
         
+        //アイテムスコアを初期化する
+        itemScore = 0
+        itemScoreLabelNode.text = String("ItemScore:\(itemScore)")
+        
         bird.position = CGPoint(x: self.frame.size.width * 0.2, y:self.frame.size.height * 0.7)
         bird.physicsBody?.velocity = CGVector.zero
         bird.physicsBody?.collisionBitMask = groundCategory | wallCategory
@@ -358,6 +380,7 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
         
         bird.speed = 1
         scrollNode.speed = 1
+        
     }
     func setupScoreLabel() {
         score = 0
@@ -397,12 +420,19 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
         let bestItemScore = userDefaults.integer(forKey: "ITEM")
         bestItemScoreLabelNode.text = "BestItemScore:\(bestItemScore)"
         self.addChild(bestItemScoreLabelNode)
+        
+        //let bestScore = userDefaults.integer(forKey: "BEST")
+        //bestScoreLabelNode.text = "Best Score:\(bestScore)"
+        //self.addChild(bestScoreLabelNode)
     }
     func setupItem(){
         var i:Int = 0
         // アイテムの画像を読み込む
         let itemTexture = SKTexture(imageNamed: "bitcoin")
         itemTexture.filteringMode = .linear
+       
+        
+        
         
         let moveItem = SKAction.moveBy(x: -(self.frame.size.width+itemTexture.size().width*2), y: 0, duration: 5)
         let resetItem = SKAction.moveBy(x: (self.frame.size.width+itemTexture.size().width*2), y: 0, duration: 0)
@@ -413,10 +443,24 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
             
             let item = SKSpriteNode(texture: itemTexture)
             item.position = CGPoint(x: self.frame.size.width+itemTexture.size().width, y: self.frame.size.height/2)
+            item.zPosition = -50.0 // 雲より手前、地面より奥
             item.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: item.size.width, height: item.size.height))
             item.physicsBody?.isDynamic = false
             item.physicsBody?.categoryBitMask = self.itemCategory
             item.physicsBody?.contactTestBitMask = self.birdCategory
+           
+            //アイテムをy軸でランダム表示させることができたが、鳥の前に出てこない
+            //let item_center_y = self.frame.size.height / 2
+            //let random_item_range = self.frame.size.height / 4
+            //let item_lowest_y = UInt32( item_center_y - itemTexture.size().height / 2 -  random_item_range / 2)
+            //let random_item_y = arc4random_uniform(UInt32(random_item_range))
+            //let item_y = CGFloat(item_lowest_y + random_item_y)
+            
+            //let random_item = SKSpriteNode(texture: itemTexture)
+            //random_item.position = CGPoint(x: 0.0, y: item_y)
+            
+            //random_item.run(repeatScrollItem)
+            //self.itemNode.addChild(random_item)
             
             item.run(repeatScrollItem)
             self.itemNode.addChild(item)
