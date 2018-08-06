@@ -7,22 +7,33 @@
 //
 
 import SpriteKit
+import AVFoundation
 
 class GameScene: SKScene,SKPhysicsContactDelegate {
     var scrollNode:SKNode!
     var wallNode:SKNode!
     var bird:SKSpriteNode!
+    var itemNode:SKNode!
     
     // 衝突判定カテゴリー ↓追加
     let birdCategory: UInt32 = 1 << 0       // 0...00001
     let groundCategory: UInt32 = 1 << 1     // 0...00010
     let wallCategory: UInt32 = 1 << 2       // 0...00100
     let scoreCategory: UInt32 = 1 << 3      // 0...01000
-    
+    //アイテムの衝突判定
+    let itemCategory: UInt32 = 1 << 4       // 0...10000
     // スコア
     var score = 0
     var scoreLabelNode:SKLabelNode!    // ←追加
     var bestScoreLabelNode:SKLabelNode!    // ←追加
+    //アイテムスコア
+    var itemScore = 0
+    var itemScoreLabelNode:SKLabelNode!
+    var bestItemScoreLabelNode:SKLabelNode!
+    
+    var audioPlayerInstance01: AVAudioPlayer!
+    
+    
     let userDefaults:UserDefaults = UserDefaults.standard
     //SKView上にシーンが表示された時に呼ばれるメソッド
     override func didMove(to view: SKView) {
@@ -39,12 +50,17 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
         wallNode = SKNode()
         scrollNode.addChild(wallNode)
         
+        //アイテムノード
+        itemNode = SKNode()
+        scrollNode.addChild(itemNode)
+        
         //各種スプライトを生成する処理をメソッドに分割
         setupGround()
         setupCloud()
         setupWall()
         setupBird()
-        
+        setupItem()
+        itemSound()
         setupScoreLabel()
     }
     func setupGround(){
@@ -285,7 +301,23 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
                 userDefaults.set(bestScore, forKey: "BEST")
                 userDefaults.synchronize()
             } // --- ここまで
-        } else {
+        }else if (contact.bodyA.categoryBitMask & itemCategory ) == itemCategory || ( contact.bodyB.categoryBitMask & itemCategory ) == itemCategory {
+            // アイテムと衝突したと判定
+            if(contact.bodyA.categoryBitMask & itemCategory ) == itemCategory {
+                itemNode.removeChildren(in: [contact.bodyA.node!])
+            }
+            else if ( contact.bodyB.categoryBitMask & itemCategory ) == itemCategory {
+                itemNode.removeChildren(in: [contact.bodyB.node!])
+            }
+            
+            audioPlayerInstance01.play()
+            
+            print("ItemGet")
+            itemScore += 1
+            itemScoreLabelNode.text = "Item Score:\(itemScore)"
+        }
+        
+        else {
             // 壁か地面と衝突した
             print("GameOver")
             
@@ -299,6 +331,18 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
                 self.bird.speed = 0
             })
         }
+    }
+    func itemSound() {
+        let soundFilePath01 = Bundle.main.path(forResource: "coinSound", ofType: "mp3")
+        let sound01:URL = URL(fileURLWithPath: soundFilePath01!)
+        
+        do {
+            audioPlayerInstance01 = try AVAudioPlayer(contentsOf: sound01, fileTypeHint: nil)
+        } catch {
+            print("AVAudioPlayerインスタンス作成失敗")
+        }
+        // 音の準備
+        audioPlayerInstance01.prepareToPlay()
     }
     
     func restart() {
@@ -334,6 +378,55 @@ class GameScene: SKScene,SKPhysicsContactDelegate {
         let bestScore = userDefaults.integer(forKey: "BEST")
         bestScoreLabelNode.text = "Best Score:\(bestScore)"
         self.addChild(bestScoreLabelNode)
+        
+        itemScore = 0
+        itemScoreLabelNode = SKLabelNode()
+        itemScoreLabelNode.fontColor = UIColor.black
+        itemScoreLabelNode.position = CGPoint(x: 10, y: self.frame.size.height - 120)
+        itemScoreLabelNode.zPosition = 100 // 一番手前に表示する
+        itemScoreLabelNode.horizontalAlignmentMode = SKLabelHorizontalAlignmentMode.left
+        itemScoreLabelNode.text = "ItemScore:\(itemScore)"
+        self.addChild(itemScoreLabelNode)
+        
+        bestItemScoreLabelNode = SKLabelNode()
+        bestItemScoreLabelNode.fontColor = UIColor.black
+        bestItemScoreLabelNode.position = CGPoint(x: 10, y: self.frame.size.height - 150)
+        bestItemScoreLabelNode.zPosition = 100 // 一番手前に表示する
+        bestItemScoreLabelNode.horizontalAlignmentMode = SKLabelHorizontalAlignmentMode.left
+        
+        let bestItemScore = userDefaults.integer(forKey: "ITEM")
+        bestItemScoreLabelNode.text = "BestItemScore:\(bestItemScore)"
+        self.addChild(bestItemScoreLabelNode)
     }
-
+    func setupItem(){
+        var i:Int = 0
+        // アイテムの画像を読み込む
+        let itemTexture = SKTexture(imageNamed: "bitcoin")
+        itemTexture.filteringMode = .linear
+        
+        let moveItem = SKAction.moveBy(x: -(self.frame.size.width+itemTexture.size().width*2), y: 0, duration: 5)
+        let resetItem = SKAction.moveBy(x: (self.frame.size.width+itemTexture.size().width*2), y: 0, duration: 0)
+        let repeatScrollItem = SKAction.repeatForever(SKAction.sequence([moveItem, resetItem]))
+        
+        let createItemAnimation = SKAction.run {
+            i += 1
+            
+            let item = SKSpriteNode(texture: itemTexture)
+            item.position = CGPoint(x: self.frame.size.width+itemTexture.size().width, y: self.frame.size.height/2)
+            item.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: item.size.width, height: item.size.height))
+            item.physicsBody?.isDynamic = false
+            item.physicsBody?.categoryBitMask = self.itemCategory
+            item.physicsBody?.contactTestBitMask = self.birdCategory
+            
+            item.run(repeatScrollItem)
+            self.itemNode.addChild(item)
+        }
+        
+        let waitAnimation = SKAction.wait(forDuration: 2)
+        let repeatForeverAnimation = SKAction.repeatForever(SKAction.sequence([createItemAnimation, waitAnimation]))
+        
+        itemNode.run(repeatForeverAnimation)
+        
+        
+        }
 }
